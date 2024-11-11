@@ -1,9 +1,42 @@
+const bcrypt = require('bcrypt'); // For password hashing
+const session = require('express-session'); // For session management
 
 const express = require('express');
 const corelink = require('corelink-client');  // Assuming corelink-client is available
 const cors = require('cors');  // Importing CORS middleware
 
 const app = express();
+
+app.use(session({
+  secret: 'supersecretkey', // Change to a secure key for production
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // Set to true if using HTTPS
+}));
+
+const users = [
+  { username: 'hsrn_user', password: await bcrypt.hash('nyu_secure_password', 10) }
+];
+
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+  const user = users.find(user => user.username === username);
+  if (user && await bcrypt.compare(password, user.password)) {
+    req.session.user = username;
+    return res.status(200).send('Login successful');
+  }
+  res.status(401).send('Unauthorized');
+});
+
+function isAuthenticated(req, res, next) {
+  if (req.session.user) {
+    return next();
+  }
+  res.status(401).send('Unauthorized');
+}
+
+
+
 const PORT = 3000;
 
 const config = {
@@ -75,7 +108,7 @@ app.get('/startStream', async (req, res) => {
 });
 
 // Endpoint to list streams (this will simulate the response)
-app.get('/listStreams', async (req, res) => {
+app.get('/listStreams', isAuthenticated, async (req, res) => {
   const streams = [
     { id: 1, name: 'Random Data Stream 1' },
     { id: 2, name: 'Random Data Stream 2' },
@@ -84,15 +117,12 @@ app.get('/listStreams', async (req, res) => {
   res.json(streams);  // Send the streams as JSON
 });
 
-// Endpoint to disconnect a specific stream
-app.post('/disconnectStream/:id', async (req, res) => {
+app.post('/disconnectStream/:id', isAuthenticated, async (req, res) => {
   const streamId = req.params.id;
   console.log(`Disconnecting stream with ID: ${streamId}`);
 
   // Logic to disconnect the stream
-  // In your case, you could use Corelink's disconnect function
   if (sender && streamId) {
-    // Example of how you could disconnect the stream (modify according to Corelink's API)
     corelink.disconnect({ streamIDs: [streamId] }).then(() => {
       res.send(`Stream ${streamId} disconnected`);
     }).catch(err => {
@@ -104,7 +134,7 @@ app.post('/disconnectStream/:id', async (req, res) => {
 });
 
 // Serve the frontend HTML
-app.use(express.static('public'));  // This assumes your HTML and JS are in the 'public' folder
+app.use(isAuthenticated, express.static('public'));  // This assumes your HTML and JS are in the 'public' folder
 
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
