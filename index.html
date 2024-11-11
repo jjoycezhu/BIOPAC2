@@ -1,28 +1,250 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Stream Viewer</title>
-</head>
-<body>
-    <h1>Stream List</h1>
+<html>
+    <head>
+      <script src="https://corelink.hpc.nyu.edu/client/browser/corelink.browser.lib.js"></script> <!-- this is the library-->
+      <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
-    <!-- Login Form -->
-    <div id="login-form">
-        <input type="text" id="username" placeholder="Username">
-        <input type="password" id="password" placeholder="Password">
-        <button onclick="login()">Login</button>
-        <p id="login-message"></p>
-    </div>
+      <meta charset="utf-8"/>
+      <title>Real Time Distance Data</title>
+    </head>
+    <body>
+      <h1>Real Time Data Visualization using Corelink</h1>
+        <!-- Disconnect button -->
+      <button id="disconnect-btn">Disconnect</button>
+      <!----
+        <select id="color-select">
+            <option value="">--Please choose an option--</option>
+            <option value="rgb(255,0,0)" selected="selected">Red</option>
+            <option value="rgb(0,128,0)">Green</option>
+            <option value="rgb(0,0,255)">Blue</option>
+            <option value="rgb(255,255,0)">Yellow</option>
+            <option value="Black">Black</option>
+        </select>
 
-    <!-- Button to load streams -->
-    <div id="stream-controls" style="display: none;">
-        <button onclick="displayStreams()">List Streams</button>
-        <div id="stream-container"></div>
-    </div>
-
-    <!-- Include the streams.js file -->
-    <script src="streams.js"></script>
-</body>
+        <select id="bar-select">
+            <option value="">--Please choose an option--</option>
+            <option value="line" selected="selected">line</option>
+            <option value="bar">bar</option>
+        </select>
+          --->
+        <div id="line-chart"></div>
+        <div id="line-chart2"></div>
+        <div id="graph"></div>
+    </body>
 </html>
+
+
+<script>
+const workspace = 'Holodeck'
+const protocol = 'ws'
+const datatype = ['distance']
+var receiverdata = 0.0
+let corelinkConnection; // Declare corelinkConnection at the top
+
+function ab2str(buf) {
+  var rawData=String.fromCharCode.apply(null, new Uint8Array(buf))
+  return parseFloat(rawData)
+}
+
+const run = async () => 
+{
+
+  config = {}
+  config.username = 'Testuser'
+  config.password = 'Testpassword'
+  config.host = 'corelink.hpc.nyu.edu'
+  config.port = 20012
+
+  corelinkConnection = await corelink.connect({ username: config.username, password: config.password }, { ControlIP: config.host, ControlPort: config.port });
+  if (corelinkConnection) {
+      console.log('Corelink connected successfully');
+
+    //const btn = document.createElement('button')
+    //btn.innerHTML = "Hey there we have a new stream"
+    //console.log("butttttonnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",btn)
+    //btn.setAttribute('onclick', 'alert("hello")')
+
+    corelink.on('receiver', (e) => console.log('receiver callback', e))
+    corelink.on('sender', (e) => console.log('sender callback', e))
+
+    corelink.on('stale', (streamID) => {
+          console.log("Stream has been dropped", streamID)
+          var iDiv = document.getElementById(streamID.streamID)
+          var btnid = "stream"+streamID.streamID
+          console.log(btnid)
+          var btn = document.getElementById(btnid)
+          console.log("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$",streamID.streamID)
+          if(iDiv)
+          {
+            iDiv.remove()
+            btn.remove()
+          }
+    })
+    
+    corelink.on('dropped', (streamID) =>{
+          console.log("Steam has been dropped", streamID)
+          var iDiv = document.getElementById(streamID.streamID);
+          var btnid = "stream"+streamID.streamID
+          console.log(btnid)
+          var btn = document.getElementById(btnid)
+          //console.log("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$",streamID)
+          if(iDiv)
+          {
+            iDiv.remove()
+            btn.remove()
+          }
+    })
+
+    streams = await corelink.createReceiver({
+      workspace, protocol, type: datatype, echo: true, alert: true,
+    }).catch((err) => { console.log(err) })
+
+    streams.forEach(async data => {
+        var btn = document.createElement("BUTTON")   // Create a <button> element
+        btn.innerHTML = " Plot: "+data.streamID+" "+data.meta.name
+         btn.id = "stream"+data.streamID
+        var iDiv = document.createElement('div')
+        iDiv.id = data.streamID
+        btn.onclick = () => plotmydata(iDiv.id)
+        document.body.appendChild(btn)
+        document.body.appendChild(iDiv)
+    })
+
+    
+    corelink.on('receiver', async (data) => {
+        var btn = document.createElement("BUTTON")  // Create a <button> element
+        btn.innerHTML = " Plot: "+data.streamID+" "+data.meta.name;
+        btn.id = "stream"+data.streamID
+        var iDiv = document.createElement('div')
+        iDiv.id = data.streamID;
+        btn.onclick = () => plotmydata(iDiv.id)
+        document.body.appendChild(btn)
+        document.body.appendChild(iDiv)
+
+        await corelink.subscribe({streamIDs: [data.streamID]})
+    })
+
+    corelink.on('data', (streamID, data, header) => {
+     
+          receiverdata=ab2str(data)
+          window[streamID+'_data'] = ab2str(data)
+          console.log(streamID, window[streamID+'_data'])
+      
+    }).catch((err) => {console.log(err)})
+  }
+}
+
+// Function to disconnect Corelink connection
+const disconnectCorelink = async () => {
+            if (corelinkConnection) {
+                await corelink.disconnect();
+                console.log("Corelink disconnected successfully");
+            }
+        };
+
+        // Disconnect button listener
+            document.getElementById('disconnect-btn').addEventListener('click', () => {
+            disconnectCorelink();
+        });
+
+function rand() {
+  return Math.random();
+}
+
+
+function plotmydata(divid)
+{
+  let time = new Date();
+    {  
+       
+        Plotly.newPlot(divid,[{
+          xaxis: {
+          type: 'date',
+          domain: [time],
+          showticklabels: false,
+        },x: [time],
+
+          
+            y:[window[divid+'_data']],
+            
+            marker: {
+                    color: 'blue',
+                    width: 3
+                  },
+             mode: 'lines',
+            line: {
+                    shape: 'spline'
+                }
+
+        }],{
+        updatemenus: [{
+
+            y: 1,
+            yanchor: 'top',
+            buttons: [ {
+                method: 'restyle',
+                args: ['marker.color', 'blue'],
+                label: 'blue'
+            },{
+                method: 'restyle',
+                args: ['marker.color', 'red'],
+                label: 'red'
+            }, {
+                method: 'restyle',
+                args: ['marker.color', 'green'],
+                label: 'green'
+            }]
+        },
+        {
+            y:0.5,
+            yanchor: 'top',
+            buttons: 
+            [
+            {
+                method: 'restyle',
+                args: ['type', 'line'],
+                label:'line'
+            },
+            {
+                method: 'restyle',
+                args: ['type', 'bar'],
+                label:'bar'
+            } 
+            ]
+        }],
+    })
+    }
+
+    var cnt = 0;
+
+    var interval = setInterval(function() 
+    {
+        var time = new Date(); 
+        var update = {
+        x:  [[time]],
+        y: [[window[divid+'_data']]]
+        }
+
+       
+        
+        let olderTime = time.setMinutes(time.getMinutes() - 1)
+        let futureTime = time.setMinutes(time.getMinutes() + 1)
+
+        var minuteView = {
+        xaxis: {
+          type: 'date',
+          range: [olderTime,futureTime]
+        }
+        };
+
+        Plotly.relayout(divid, minuteView);
+        Plotly.extendTraces(divid, update, [0]) 
+
+     
+
+            if(cnt === 100) clearInterval(interval);
+      
+    },1000);
+}
+
+run()
+</script>
