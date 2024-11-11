@@ -8,12 +8,18 @@
 <body>
     <h1>Stream List</h1>
 
-    <!-- Button to load streams -->
-    <button onclick="displayStreams()">List Streams</button>
+    <!-- Login Form -->
+    <div id="login-form">
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+        <p id="login-message"></p>
+    </div>
 
-    <!-- Container where stream information will be displayed -->
-    <div id="stream-container">
-        <!-- Stream information will be dynamically inserted here -->
+    <!-- Button to load streams -->
+    <div id="stream-controls" style="display: none;">
+        <button onclick="displayStreams()">List Streams</button>
+        <div id="stream-container"></div>
     </div>
 
     <!-- Include the streams.js file -->
