@@ -1,5 +1,30 @@
 // streams.js (Frontend)
 
+// Function to handle user login
+async function login() {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    try {
+        const response = await fetch('http://localhost:3000/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (response.status === 200) {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('stream-controls').style.display = 'block';
+            displayStreams(); // Load streams after successful login
+        } else {
+            document.getElementById('login-message').innerText = 'Login failed';
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+    }
+}
+
+// Function to display the list of active streams
 async function displayStreams() {
   try {
     const response = await fetch('http://localhost:3000/listStreams');
@@ -23,6 +48,7 @@ async function displayStreams() {
   }
 }
 
+// Function to disconnect a specific stream by ID
 async function disconnectStream(streamId) {
   try {
     await fetch(`http://localhost:3000/disconnectStream/${streamId}`, { method: 'POST' });
