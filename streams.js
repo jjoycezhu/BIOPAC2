@@ -1,60 +1,52 @@
-// streams.js (Frontend)
+// V1.0.0.0
 
-// Function to handle user login
-async function login() {
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-
-    try {
-        const response = await fetch('http://localhost:3000/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
-
-        if (response.status === 200) {
-            document.getElementById('login-form').style.display = 'none';
-            document.getElementById('stream-controls').style.display = 'block';
-            displayStreams(); // Load streams after successful login
-        } else {
-            document.getElementById('login-message').innerText = 'Login failed';
-        }
-    } catch (error) {
-        console.error('Login error:', error);
+const config = {
+    ControlPort: 20012,
+    /*            ControlIP: '127.0.0.1', */
+    ControlIP: 'corelink.hpc.nyu.edu',
+    autoReconnect: false,
+    /*
+      for service in a local network please replace the certificate with the appropriate version
+    cert: '<corelink-tools-repo>/config/ca-crt.pem'
+    */
+  }
+  const username = 'Testuser'
+  const password = 'Testpassword'
+  const corelink = require('corelink-client')
+  
+  // Setup
+  const workspace = 'Holodeck'
+  const protocol = 'tcp'
+  const datatype = 'distance'
+  
+  corelink.debug = true
+  
+  let iter = 0
+  
+  function randomdata() {
+    iter++
+    console.log(iter.toString())
+    return iter.toString()
+  }
+  const run = async () => {
+    let sender
+    if (await corelink.connect({ username, password }, config).catch((err) => { console.log(err) })) {
+      sender = await corelink.createSender({
+        workspace,
+        protocol,
+        type: datatype,
+        metadata: { name: 'Random Data' },
+      }).catch((err) => { console.log(err) })
     }
-}
-
-// Function to display the list of active streams
-async function displayStreams() {
-  try {
-    const response = await fetch('http://localhost:3000/listStreams');
-    const streams = await response.json();  // Parse the response as JSON
-
-    const streamContainer = document.getElementById("stream-container");
-    streamContainer.innerHTML = ""; // Clear previous content
-
-    streams.forEach((stream) => {
-      const streamElement = document.createElement("div");
-      streamElement.className = "stream-item";
-      streamElement.innerHTML = `
-        <p>Stream ID: ${stream.id}</p>
-        <p>Stream Name: ${stream.name}</p>
-        <button onclick="disconnectStream('${stream.id}')">Disconnect</button>
-      `;
-      streamContainer.appendChild(streamElement);
-    });
-  } catch (error) {
-    console.error("Error fetching stream data:", error);
+    
+    if (sender) {
+      console.log('Stream Created:', sender); // Log the sender details
+    } else {
+      console.log('Failed to create stream.');
+    }
+  
+    setInterval(() => corelink.send(sender, Buffer.from(randomdata())), 1000)
   }
-}
-
-// Function to disconnect a specific stream by ID
-async function disconnectStream(streamId) {
-  try {
-    await fetch(`http://localhost:3000/disconnectStream/${streamId}`, { method: 'POST' });
-    alert(`Stream ${streamId} has been disconnected.`);
-    displayStreams();  // Refresh the stream list
-  } catch (error) {
-    console.error(`Error disconnecting stream ${streamId}:`, error);
-  }
-}
+  
+  // Export the run function
+run();
